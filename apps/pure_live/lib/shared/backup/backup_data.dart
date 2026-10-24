@@ -42,9 +42,10 @@ Future<Map<String, Object?>> exportBackup(
   LiveStore store,
   BackupScope scope, {
   IptvLibrary? iptv,
+  bool includeSensitiveData = false,
 }) async {
   if (scope == BackupScope.follows) return await service.exportFollows();
-  final data = {...await service.exportAll()};
+  final data = {...await service.exportAll(includeSensitiveData: includeSensitiveData)};
   data[searchSection] = {'history': await _storedSearchWords(store)};
   data[iptvLibrarySection] = await exportIptvLibrary(iptv ?? StoreIptvLibrary(store));
   if (await readMultiviewSession(store.meta) case final session?) data[multiviewSection] = {'session': session};

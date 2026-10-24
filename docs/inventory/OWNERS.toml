@@ -130,6 +130,8 @@ path = [
   { glob = "apps/pure_live/lib/features/version/", sub = "A15" },
   { glob = "apps/pure_live/lib/features/web_dav/web_dav_auth.dart", sub = "J04" },
   { glob = "apps/pure_live/lib/features/web_dav/web_dav_client.dart", sub = "J04" },
+  { glob = "apps/pure_live/lib/features/web_dav/web_dav_auto_backup.dart", sub = "J04" },
+  { glob = "apps/pure_live/lib/features/web_dav/web_dav_auto_backup_scheduler.dart", sub = "J04" },
   { glob = "apps/pure_live/lib/features/web_dav/", sub = "A12" },
 
   # ---- apps/pure_live/lib/shared：各功能共用 ----
@@ -430,6 +432,13 @@ setting = [
   { key = "max_check_interval", sub = "H04" },
   { key = "auto_start_on_boot", sub = "H04" },
   { key = "recordDanmakuGifts", sub = "H01", note = "弹幕 XML 写礼物（H01.8）" },
+  # backup 分节（默认 J03；WebDAV 自动备份归 J04）
+  { key = "webdavAutoBackupEnabled", sub = "J04" },
+  { key = "webdavAutoBackupHours", sub = "J04" },
+  { key = "webdavAutoBackupScope", sub = "J04" },
+  { key = "webdavAutoBackupFolder", sub = "J04" },
+  { key = "webdavAutoBackupKeep", sub = "J04" },
+  { key = "webdavAutoBackupIncludeAccounts", sub = "J04" },
 ]
 
 # 每个分节（Setting 的 section）的默认子分类。新加分节要在这里加一行。

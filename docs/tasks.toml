@@ -1742,6 +1742,20 @@ commit = "965d41956"
 old = ["U.11c", "T09e.1"]
 
 [[task]]
+id = "A12.7"
+title = "WebDAV 自动备份设置（接 A12.5、V01.9）"
+type = "界面"
+status = "开发中"
+date = "2026-10-24"
+size = "小"
+tier = 2
+from = "V01.9（D-057）"
+stages = ["设置对话框和入口", "界面测试和真机对照"]
+done = 1
+next = "补界面测试；竖屏/横屏/宽屏看设置对话框"
+note = "WebDAV 页 ⋮ 菜单新增“自动备份”，对话框包含开关、间隔、内容、远程文件夹、保留份数、账号和上次成功；代码已写，测试和真机未跑。"
+
+[[task]]
 id = "A13.1"
 title = "网络电视管理"
 type = "界面"
@@ -3611,6 +3625,20 @@ commit = "c168fdb99"
 old = ["F.4b", "T09d.2"]
 
 [[task]]
+id = "J04.2"
+title = "运行时的定时 WebDAV 备份：启动补传、间隔上传、自动命名和保留份数（接 V01.9）"
+type = "功能"
+status = "开发中"
+date = "2026-10-24"
+size = "中"
+tier = 2
+from = "V01.9（D-057）"
+stages = ["设置和自动命名", "目录创建和上传", "调度和通知", "测试和真机"]
+done = 3
+next = "跑定向测试、i18n 和门禁；K90/Windows 上验证目录创建、成功通知和保留清理"
+note = "代码已写：WebDavClient.ensureFolder、WebDavAutoBackupService、WebDavAutoBackupScheduler、AppStartup 主窗口启动；尚未运行 Flutter 测试和门禁。"
+
+[[task]]
 id = "J05.1"
 title = "同步前勾选内容：设备同步发送、接收前选同步哪几类（接 V01.6）"
 type = "功能"
@@ -4244,6 +4272,18 @@ size = "大"
 tier = 3
 from = "上游 pure_live 0b23c32fa、796823afd、d8dc94af5 等 45 个提交（W01.3 对照）"
 note = "4.x 录制中心的“播放”交给系统里的其他应用；等用户决定做不做（D-026）；2026-10-15 用户要求整个项目做完，做了：录制面板和录制中心的“播放”在应用里打开（RecordingPlayerPage，shared/record/recording_player_page.dart）：画面、播放暂停、进度条、倍速 0.5～3（live_player 新加可选接口 PlaybackRate，mpv 实现）、同一文件夹（一个房间一个文件夹）里的录像按文件名排成上一段/下一段、每个文件记住看到哪（meta，刚开始或快结束时从头）；小窗没做；测试 test/shared/recording_player_test.dart"
+
+[[task]]
+id = "V01.9"
+title = "应用运行时的定时 WebDAV 备份（先出方案）"
+type = "功能"
+status = "开发中"
+date = "2026-10-24"
+size = "小"
+tier = 3
+from = "用户 2026-10-24"
+to = ["J04.2", "A12.7"]
+note = "用户确认：不做后台（WorkManager），只在应用运行时按间隔上传；启动和回前台补跑；只上传不自动恢复；成功后弹应用内通知，失败每次运行首次弹一次；设置默认关、24 小时、全部设置、purelive 目录、保留 7 份、不含账号；设置随备份同步（D-057）。"
 
 [[task]]
 id = "V02.1"

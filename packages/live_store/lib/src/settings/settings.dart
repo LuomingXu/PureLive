@@ -1758,6 +1758,51 @@ abstract final class Settings {
     scope: SettingScope.internal,
   );
 
+  /// Uploads a backup to the current WebDAV server while the app runs
+  /// (J04.2, V01.9).
+  static const webdavAutoBackupEnabled = BoolSetting('webdavAutoBackupEnabled', section: 'backup', defaultValue: false);
+
+  /// Hours between automatic WebDAV backups (J04.2).
+  static const webdavAutoBackupHours = IntSetting(
+    'webdavAutoBackupHours',
+    section: 'backup',
+    defaultValue: 24,
+    min: 1,
+    max: 168,
+  );
+
+  /// What an automatic WebDAV backup holds: `all` or `follows` (J04.2).
+  static const webdavAutoBackupScope = StringSetting(
+    'webdavAutoBackupScope',
+    section: 'backup',
+    defaultValue: 'all',
+    allowed: {'all', 'follows'},
+  );
+
+  /// Folder below the WebDAV server's base URL (J04.2).
+  static const webdavAutoBackupFolder = StringSetting(
+    'webdavAutoBackupFolder',
+    section: 'backup',
+    defaultValue: 'purelive',
+  );
+
+  /// Automatic WebDAV backups kept in [webdavAutoBackupFolder] (J04.2).
+  static const webdavAutoBackupKeep = IntSetting(
+    'webdavAutoBackupKeep',
+    section: 'backup',
+    defaultValue: 7,
+    min: 1,
+    max: 100,
+  );
+
+  /// Automatic WebDAV backups include cookies and WebDAV passwords
+  /// (J04.2); off by default, as manual backups.
+  static const webdavAutoBackupIncludeAccounts = BoolSetting(
+    'webdavAutoBackupIncludeAccounts',
+    section: 'backup',
+    defaultValue: false,
+  );
+
   /// Where update packages are downloaded (3.x `CacheController`'s
   /// `downloadDirectoryPath`); empty is the platform default. A path of this
   /// device, so backups do not carry it.
@@ -2126,6 +2171,12 @@ abstract final class Settings {
     localInteractionGrowthDay,
     localInteractionGiftEffectLevel,
     backupDirectory,
+    webdavAutoBackupEnabled,
+    webdavAutoBackupHours,
+    webdavAutoBackupScope,
+    webdavAutoBackupFolder,
+    webdavAutoBackupKeep,
+    webdavAutoBackupIncludeAccounts,
     downloadDirectoryPath,
     downloadDirectoryDecisionMade,
     enableLocalLog,

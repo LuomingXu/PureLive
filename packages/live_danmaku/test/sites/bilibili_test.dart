@@ -666,14 +666,8 @@ void main() {
           const LiveMessageColor(0x3F, 0xB4, 0xF6),
         );
         expect(one(chat(medal: {'name': '小路泥', 'level': 22})).fansColor, isNull);
-        expect(
-          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': '#12345'})).fansColor,
-          isNull,
-        );
-        expect(
-          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': 'teal'})).fansColor,
-          isNull,
-        );
+        expect(one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': '#12345'})).fansColor, isNull);
+        expect(one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': 'teal'})).fansColor, isNull);
         // The old shape (rich user as JSON text, no medal) and none at all.
         expect(one(_danmu('旧')).fansName, '');
         expect(one(_danmu('旧')).data, isNull);

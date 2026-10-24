@@ -174,6 +174,8 @@ Map<String, Iterable<String>> variableKeyTables() => {
 /// translated (widget keys, file names).
 const notTranslationKeyTemplates = {
   '*_**', // shared/backup/backup_files.dart: a numbered file name
+  '*_', // shared/backup/backup_files.dart: an automatic backup name prefix
+  '*_auto_', // shared/backup/backup_files.dart: an automatic backup name prefix
   'archive_*', // tv/video/video_panes.dart: a Bilibili history row id
   'favorite_areas_*', // features/areas/favorite_areas_view.dart: a PageStorageKey
   'instance_*', // app/launch_args.dart: a safe instance name

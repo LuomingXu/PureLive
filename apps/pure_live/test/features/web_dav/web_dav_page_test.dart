@@ -73,6 +73,7 @@ final class FakeDav implements LiveHttp {
         }
         return answer(207, '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">$responses</D:multistatus>');
       case 'PUT':
+        if (!dirs.contains(_parent(key))) return answer(409);
         files[key] = request.body ?? const [];
         return answer(201);
       case 'GET':
@@ -80,8 +81,18 @@ final class FakeDav implements LiveHttp {
         return bytes == null ? answer(404) : LiveResponse(status: 200, bytes: bytes, url: request.url);
       case 'DELETE':
         return files.remove(key) == null && !dirs.remove(key) ? answer(404) : answer(204);
+      case 'MKCOL':
+        if (dirs.contains(key)) return answer(405);
+        if (!dirs.contains(_parent(key))) return answer(409);
+        dirs.add(key);
+        return answer(201);
     }
     return answer(405);
+  }
+
+  static String _parent(String key) {
+    final slash = key.lastIndexOf('/');
+    return slash < 0 ? '' : key.substring(0, slash);
   }
 
   @override
@@ -409,6 +420,55 @@ void main() {
       error,
     );
     expect(find.text('添加新配置'), findsOneWidget);
+  });
+
+  testWidgets('auto backup settings open from ⋮, save all values and explain the folder', (tester) async {
+    final dav = FakeDav();
+    final services = await _pump(tester, dav, server: _server);
+    await tester.tap(find.byKey(const ValueKey('webdav-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-menu-auto-backup')));
+    await tester.pumpAndSettle();
+    expect(find.text('自动备份'), findsOneWidget);
+    expect(find.byKey(const ValueKey('webdav-auto-enabled')), findsOneWidget);
+    expect(find.text('purelive'), findsOneWidget);
+    expect(find.text('还没有成功备份过'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-enabled')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-hours')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-hours-6')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-scope')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-scope-follows')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Switch>(
+            find.descendant(of: find.byKey(const ValueKey('webdav-auto-accounts')), matching: find.byType(Switch)),
+          )
+          .onChanged,
+      isNull,
+      reason: 'a follows-only backup never carries accounts',
+    );
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-keep')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-keep-3')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('webdav-auto-folder')), 'backup/purelive');
+    await tester.tap(find.byKey(const ValueKey('webdav-auto-save')));
+    await _settle(tester);
+
+    final settings = services.store.settings;
+    expect(settings.get(Settings.webdavAutoBackupEnabled), isTrue);
+    expect(settings.get(Settings.webdavAutoBackupHours), 6);
+    expect(settings.get(Settings.webdavAutoBackupScope), 'follows');
+    expect(settings.get(Settings.webdavAutoBackupFolder), 'backup/purelive');
+    expect(settings.get(Settings.webdavAutoBackupKeep), 3);
+    expect(settings.get(Settings.webdavAutoBackupIncludeAccounts), isFalse);
+    expect(_toasts, contains('自动备份设置已保存'));
   });
 
   testWidgets('an upload that fails says why and offers "重试"', (tester) async {

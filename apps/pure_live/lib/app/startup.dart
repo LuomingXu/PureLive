@@ -15,6 +15,8 @@ import 'package:pure_live/features/favorite/favorite_controller.dart';
 import 'package:pure_live/features/home/home_menu.dart';
 import 'package:pure_live/features/settings/data_tools.dart';
 import 'package:pure_live/features/settings/settings_editors.dart';
+import 'package:pure_live/features/web_dav/web_dav_auto_backup.dart';
+import 'package:pure_live/features/web_dav/web_dav_auto_backup_scheduler.dart';
 import 'package:pure_live/i18n/i18n.dart';
 import 'package:pure_live/platform/display_mode.dart';
 import 'package:pure_live/platform/system_access.dart';
@@ -55,8 +57,9 @@ abstract final class LegacyReloginNotice {
 /// its services, in every window): the first check of every follow, the
 /// exit timer, the timed cover refresh, Android 17's local-network
 /// permission for a LAN proxy, the display mode, the one-time removal of
-/// masked blocked names ([MaskedNameBlocks], B01), and one second later the
-/// Bilibili login check and the 3.x import's [LegacyReloginNotice].
+/// masked blocked names ([MaskedNameBlocks], B01), the WebDAV auto backup in
+/// the main window (J04.2), and one second later the Bilibili login check and
+/// the 3.x import's [LegacyReloginNotice].
 final class AppStartup {
   /// Creates the start-up over [_ref]'s providers.
   new(this._ref);
@@ -65,11 +68,17 @@ final class AppStartup {
   Timer? _bilibili;
   CoverRefreshTimer? _covers;
   LocalNetworkGuard? _localNetwork;
+  WebDavAutoBackupScheduler? _webdavAutoBackup;
+  Timer? _webdavStartup;
   bool _started = false;
 
   /// The first check of every follow once started; the splash page waits for
   /// it, at most [splashFollowWait].
   static Future<void>? followCheck;
+
+  /// How long after start the WebDAV auto backup checks once, so it does not
+  /// compete with the first frame (J04.2).
+  static const Duration webdavAutoBackupDelay = Duration(seconds: 3);
 
   /// Starts the work once.
   void start() {
@@ -79,6 +88,16 @@ final class AppStartup {
     AutoExitTimer.instance.attach(store.settings);
     _covers = CoverRefreshTimer(store.settings)..start();
     if (Platform.isAndroid) _localNetwork = LocalNetworkGuard(store.settings)..start();
+    final services = _ref.read(appServicesProvider);
+    if (services.launch.isPrimary) {
+      _webdavAutoBackup = WebDavAutoBackupScheduler(
+        store.settings,
+        WebDavAutoBackupService(store, services.http, BackupService(store)),
+      );
+      _webdavStartup = Timer(webdavAutoBackupDelay, () {
+        _webdavAutoBackup?.start();
+      });
+    }
     unawaited(DisplayMode.refresh());
     unawaited(
       MaskedNameBlocks.cleanOnce(store.blockLists, store.meta).catchError((Object error, StackTrace stack) {
@@ -98,8 +117,11 @@ final class AppStartup {
   /// Stops what is still waiting.
   void dispose() {
     _bilibili?.cancel();
+    _webdavStartup?.cancel();
+    _webdavStartup = null;
     unawaited(_covers?.dispose());
     unawaited(_localNetwork?.dispose());
+    _webdavAutoBackup?.dispose();
     if (_started) {
       AutoExitTimer.instance.detach();
       followCheck = null;

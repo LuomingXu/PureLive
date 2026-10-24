@@ -177,7 +177,13 @@ final class WebDavClient {
     }
   }
 
-  Future<LiveResponse> _send(String method, Uri url, {Map<String, String> headers = const {}, List<int>? body}) async {
+  Future<LiveResponse> _send(
+    String method,
+    Uri url, {
+    Map<String, String> headers = const {},
+    List<int>? body,
+    Set<int> accept = const {},
+  }) async {
     var sent = _sign(method, url);
     var response = await _exchange(method, url, headers, body, sent);
     if (response.status == 401 && _learn(response, sent)) {
@@ -185,7 +191,7 @@ final class WebDavClient {
       response = await _exchange(method, url, headers, body, sent);
       if (response.status == 401) _learn(response, sent);
     }
-    if (response.isSuccess) return response;
+    if (response.isSuccess || accept.contains(response.status)) return response;
     throw WebDavFailure(switch (response.status) {
       401 || 403 => WebDavProblem.auth,
       404 || 409 => WebDavProblem.notFound,
@@ -217,6 +223,21 @@ final class WebDavClient {
     await _send(
       'PROPFIND',
       urlOf(const [], dir: true),
+      headers: {'depth': '0', 'content-type': 'application/xml; charset=utf-8'},
+      body: utf8.encode(_propfind),
+    );
+  }
+
+  /// Makes sure [path] exists, creating every missing level with `MKCOL`
+  /// (J04.2). `405` and `409` mean the folder is already there or its
+  /// parent was just made; the final `PROPFIND` confirms it.
+  Future<void> ensureFolder(List<String> path) async {
+    for (var level = 1; level <= path.length; level++) {
+      await _send('MKCOL', urlOf(path.sublist(0, level), dir: true), accept: const {405, 409});
+    }
+    await _send(
+      'PROPFIND',
+      urlOf(path, dir: true),
       headers: {'depth': '0', 'content-type': 'application/xml; charset=utf-8'},
       body: utf8.encode(_propfind),
     );

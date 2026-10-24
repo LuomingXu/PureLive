@@ -177,9 +177,12 @@ void main() {
     }
 
     Future<void> writeBackups() async {
-      await File(p(folder, 'purelive_2026-09-01T10_00_00.txt')).writeAsString(jsonEncode(_legacyBackup([_room('2')])));
-      await File(p(folder, 'purelive_favorites_2026-09-02T10_00_00.txt'))
-          .writeAsString(jsonEncode(_legacyBackup([_room('3')])));
+      final full = File(p(folder, 'purelive_2026-09-01T10_00_00.txt'));
+      await full.writeAsString(jsonEncode(_legacyBackup([_room('2')])));
+      await full.setLastModified(DateTime(2026, 9, 1, 10));
+      final follows = File(p(folder, 'purelive_favorites_2026-09-02T10_00_00.txt'));
+      await follows.writeAsString(jsonEncode(_legacyBackup([_room('3')])));
+      await follows.setLastModified(DateTime(2026, 9, 2, 10));
     }
 
     Future<void> refresh(WidgetTester tester) async {

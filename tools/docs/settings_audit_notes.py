@@ -540,6 +540,12 @@ NOTES: dict[str, dict] = {
         'verdict': 'v4 新加（D08.5）：默认 `all`，就是开关开着时的样子（D-040）；`all` 三档都有（小礼物顶部飘屏、中礼物横幅、大礼物横幅加座驾动效），`bigOnly` 只有大礼物有、其余只进列表，`off` 都没有；旧开关关着时一律按“关”读；跟设置一起进备份和设备同步',
     },
     # ---- backup, cache, log, accounts, meta ----
+    'webdavAutoBackupEnabled': _new('J04.2（V01.9），只在前台运行'),
+    'webdavAutoBackupHours': _new('J04.2（V01.9），1～168 小时'),
+    'webdavAutoBackupScope': _new('J04.2（V01.9），全部设置 / 仅关注'),
+    'webdavAutoBackupFolder': _new('J04.2（V01.9），服务器根目录下的相对路径'),
+    'webdavAutoBackupKeep': _new('J04.2（V01.9），保留最近 N 份自动备份'),
+    'webdavAutoBackupIncludeAccounts': _new('J04.2（V01.9），默认不含 Cookie 和 WebDAV 密码'),
     'downloadDirectoryPath': {
         'v3': "''",
         'v3src': 'cache_controller.dart:108、:124-130',

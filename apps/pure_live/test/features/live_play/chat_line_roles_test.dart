@@ -363,7 +363,11 @@ void main() {
       }
       // Without the platform colour the theme's block stays (the legacy shape,
       // and gifts, whose packets carry no v2 colour).
-      await _pumpLine(tester, ChatLine.chat(_chat(fans: '小路泥', level: '22')), platform: SiteIds.bilibili);
+      await _pumpLine(
+        tester,
+        ChatLine.chat(_chat(fans: '小路泥', level: '22')),
+        platform: SiteIds.bilibili,
+      );
       final chip = tester.widget<ChatChip>(find.byKey(const ValueKey('live-play-chat-fans')));
       expect(chip.background, const LiveTheme().light.colorScheme.primary);
     });

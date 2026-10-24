@@ -10,6 +10,7 @@ WebDAV 备份。
   - 客户端 `apps/pure_live/lib/features/web_dav/web_dav_client.dart`：`PROPFIND`（列目录、测试连接）、`GET`、`PUT`、`DELETE`，多状态回答的解析，错误分类（账号或密码、找不到、连不上、服务器状态码）。
   - 认证 `web_dav_auth.dart`：读 `WWW-Authenticate`、Digest（RFC 7616/2617 的 MD5、MD5-sess，`qop=auth` 或不带）、自写的 MD5。
   - 服务器配置的存储：`packages/live_store/lib/src/webdav.dart`（`WebDavConfig`、`WebDavStore`；密码在密钥库 `webdav/<名字>`，当前服务器按名字记在 `meta` 的 `webdav.current`），以及页面里用到的客户端选择（`web_dav_page.dart:97` 按选中的服务器建一个，`:181-186` 测试连接每次新建）。
+  - 应用运行时的定时备份（J04.2、V01.9）：`web_dav_auto_backup.dart`（到期、上传、保留、meta）、`web_dav_auto_backup_scheduler.dart`（前台定时、生命周期、通知）；设置和默认值见 J04.2 README。
 - 不包括（归哪里）：
   - WebDAV 页、配置对话框、帮助页的样子和交互 → [A12.5](../../A-界面设计/A12-账号和数据界面/A12.5-WebDAV/README.md)。
   - 上传和恢复的内容（备份格式、恢复预览、恢复锁）→ J03；页面上的恢复走 J03 的 `restoreWithPreview`。
@@ -17,7 +18,7 @@ WebDAV 备份。
 
 ## 现状：做到哪、怎么工作的
 
-- 用户看得到的（设置 → 数据 → 备份与恢复 → WebDAV）：添加服务器时填名称、地址、账号、密码，可以“测试连接”；选中一个服务器后浏览目录、上传完整备份或仅关注、点文件恢复（先预览）、删除（先确认）；服务器只认 Digest 的也能连（J04.1）；应用代理打开时 WebDAV 也走代理。
+- 用户看得到的（设置 → 数据 → 备份与恢复 → WebDAV）：添加服务器时填名称、地址、账号、密码，可以“测试连接”；选中一个服务器后浏览目录、上传完整备份或仅关注、点文件恢复（先预览）、删除（先确认）；服务器只认 Digest 的也能连（J04.1）；应用代理打开时 WebDAV 也走代理。⋮ 菜单里的“自动备份”可以设置应用运行时的定时上传（J04.2、A12.7）。
 - 内部怎么工作：
 
 ```text
@@ -43,6 +44,9 @@ WebDavClient(LiveHttp, WebDavConfig)（web_dav_client.dart:76）
 | `apps/pure_live/lib/features/web_dav/web_dav_client.dart`（310 行） | `WebDavEntry`（`:9`）、`WebDavFailure`（`:45`）、`WebDavClient`（`:76`：`urlOf`、`_target`（`:104`，Digest 签的请求目标）、签名、`_learn`（`:140`）、`_exchange`（`:157`）、`_send`（`:180`）、`list`（`:204`）、`check`（`:216`）、`write`（`:229`）、`remove`（`:233`））、`parseMultistatus`（`:240`） |
 | `apps/pure_live/lib/features/web_dav/web_dav_auth.dart`（237 行） | `AuthChallenge`（`:5`）、`parseAuthChallenges`（`:18`，多行、一行多个、引号里的逗号和转义）、`DigestChallenge`（`:69`）、`digestAuthorization`（`:127`）、`randomCnonce`（`:161`）、`md5Hex`（`:179`，不为它加 `crypto` 依赖） |
 | `packages/live_store/lib/src/webdav.dart`（180 行） | `WebDavConfig`（地址规则：http/https、有主机、没有用户信息、没有查询和片段）、`WebDavStore`（`all`、`current`、`add`、`update`、`remove`、`select`、`replaceAll(withPasswords:)` `:149`；`webdav.current` `:85`） |
+| `apps/pure_live/lib/features/web_dav/web_dav_auto_backup.dart` | `parseWebDavFolder`、到期/退避、`WebDavAutoBackupService.runIfDue`、保留清理、meta 键 |
+| `apps/pure_live/lib/features/web_dav/web_dav_auto_backup_scheduler.dart` | 前台定时、暂停/恢复、单飞、成功/首次失败通知 |
+| `apps/pure_live/lib/features/web_dav/web_dav_auto_backup_dialog.dart` | A12.7 的设置对话框 |
 | `apps/pure_live/lib/features/web_dav/web_dav_page.dart`（738 行）、`web_dav_config_dialog.dart`（209 行）、`web_dav_help.dart`（241 行） | 界面为主（A12.5）；逻辑相关的只有 `webDavHttpProvider`（`web_dav_page.dart:23`，测试替换）和建客户端的两处（`:97`、`:186`） |
 
 测试：
@@ -52,6 +56,8 @@ WebDavClient(LiveHttp, WebDavConfig)（web_dav_client.dart:76）
 | `apps/pure_live/test/features/web_dav/web_dav_auth_test.dart`（5） | MD5（RFC 1321）、Digest（RFC 7616 3.9.1）、`WWW-Authenticate` 各种写法；只认 Digest 的服务器全流程（nc 递增、uri 含 `/dav/`）；MD5-sess、`stale`、不带 qop、密码错只发两次；Basic、两种都给、不带 `WWW-Authenticate`、只给 Bearer；本机回环上的真实 HTTP 栈 |
 | `apps/pure_live/test/features/web_dav/web_dav_page_test.dart`（10） | 多状态回答解析；页面：添加时测试连接、列文件、上传、恢复、子目录、删除、面包屑（假服务器只认 Basic、401 不带 `WWW-Authenticate`，走“Basic 再试一次”） |
 | `packages/live_store/test/stores_test.dart` | WebDAV 密码进密钥库、地址规则 |
+| `apps/pure_live/test/features/web_dav/web_dav_auto_backup_test.dart` | 自动文件名和保留正则、目录校验、到期/退避、上传和 meta、失败、保留、账号、MKCOL |
+| `apps/pure_live/test/features/web_dav/web_dav_auto_backup_scheduler_test.dart` | 前台定时、暂停/恢复、单飞、成功和首次失败通知 |
 
 ## 3.x 基线
 
@@ -82,7 +88,7 @@ WebDavClient(LiveHttp, WebDavConfig)（web_dav_client.dart:76）
 ## 路线
 
 1. S02.4 第 2 条做完后，结果写回 J04.1 README 的“验证”。
-2. 以后：WebDAV 定时备份（3.x 没有，见清点“统计”一节末尾“v3 没有的”）如果要做，先进 V01 提议。
+2. J04.2：应用运行时的定时备份已登记，代码和测试已写，等工具链和真机验证；设置界面在 A12.7。
 
 <!-- docs:生成开始（下面由 tools/docs/docs.py 根据 docs/tasks.toml 生成，不要手改） -->
 
@@ -91,11 +97,20 @@ WebDavClient(LiveHttp, WebDavConfig)（web_dav_client.dart:76）
 属于 [J 设置和数据](../README.md)。
 
 - 代码：`features/web_dav/`
-- 进度：`████████████████████` 100%
+- 进度：`█████████████████░░░` 84%
 
 
 | 编号 | 任务 | 类型 | 状态 | 日期 | 提交 | 资料 |
 |---|---|---|---|---|---|---|
 | J04.1 | WebDAV Digest 认证 | 功能 | 完成 | 2026-10-02 | c168fdb99 | [设计或说明](J04.1-WebDAVDigest认证/README.md)、[记录](J04.1-WebDAVDigest认证/record.md) |
+| J04.2 | 运行时的定时 WebDAV 备份：启动补传、间隔上传、自动命名和保留份数（接 V01.9） | 功能 | 开发中 | 2026-10-24 | — | [设计或说明](J04.2-应用运行时的定时WebDAV备份/README.md)、[任务书](J04.2-应用运行时的定时WebDAV备份/brief.md)、[记录](J04.2-应用运行时的定时WebDAV备份/record.md) |
+
+## 还没完成的
+
+- **J04.2 运行时的定时 WebDAV 备份：启动补传、间隔上传、自动命名和保留份数（接 V01.9）**（开发中，第二档，规模 中）
+  - 阶段：✓ 设置和自动命名 → ✓ 目录创建和上传 → ✓ 调度和通知 → 测试和真机
+  - 接着做：跑定向测试、i18n 和门禁；K90/Windows 上验证目录创建、成功通知和保留清理
+  - 说明：代码已写：WebDavClient.ensureFolder、WebDavAutoBackupService、WebDavAutoBackupScheduler、AppStartup 主窗口启动；尚未运行 Flutter 测试和门禁。
+  - 来源：V01.9（D-057）
 
 <!-- docs:生成结束 -->

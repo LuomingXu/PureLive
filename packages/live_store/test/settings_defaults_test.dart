@@ -344,6 +344,12 @@ const Map<String, Object> newInV4 = {
   'localInteraction.growthDay': '', // D08.3: nothing given yet
   'localInteraction.giftEffectLevel': 'all', // D08.5 c2: every gift, what the switch on was (D-040)
   'recordDanmakuGifts': false, // H01.8: the chat file without gifts, as before (D-040)
+  'webdavAutoBackupEnabled': false, // J04.2 (V01.9): manual uploads as before
+  'webdavAutoBackupHours': 24, // J04.2
+  'webdavAutoBackupScope': 'all', // J04.2
+  'webdavAutoBackupFolder': 'purelive', // J04.2
+  'webdavAutoBackupKeep': 7, // J04.2
+  'webdavAutoBackupIncludeAccounts': false, // J04.2: as manual uploads
 };
 
 /// The range of every number setting: 3.x's clamps on start and on a backup
@@ -401,6 +407,8 @@ const Map<String, (num?, num?)> ranges = {
   'maxConcurrentRefresh': (1, 20),
   'thumbnailRefreshInterval': (5, 360),
   'autoSyncHoursInterval': (2, 72),
+  'webdavAutoBackupHours': (1, 168), // J04.2
+  'webdavAutoBackupKeep': (1, 100), // J04.2
   'proxyPort': (1, 65535),
   'appProxyPort': (1, 65535),
   'window_width': (400, 16384),

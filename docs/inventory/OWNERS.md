@@ -6,7 +6,7 @@
 
 路径规则按 OWNERS.toml 里的顺序第一条匹配的生效，所以一条目录规则只管前面的规则没拿走的文件。本页只随归属表、设置、来源和通道变化，加删代码文件不用重新生成。
 
-路径规则 221 条；设置 277 个（分节默认 24 条、单独指定 103 个）；来源 35 个；通道 21 个。
+路径规则 223 条；设置 283 个（分节默认 24 条、单独指定 109 个）；来源 35 个；通道 21 个。
 
 | 子分类 | 路径规则 | 设置 | 播放 | 弹幕 | 通道 |
 |---|---:|---:|---:|---:|---:|
@@ -63,7 +63,7 @@
 | J01 设置 | 4 | 3 |  |  |  |
 | J02 存储和加密 | 2 |  |  |  | 1 |
 | J03 备份恢复 | 2 | 1 |  |  |  |
-| J04 WebDAV | 3 |  |  |  |  |
+| J04 WebDAV | 5 | 6 |  |  |  |
 | J05 设备同步 | 3 | 1 |  |  |  |
 | J06 3.x 数据迁移 | 1 |  |  |  |  |
 | K01 账号和登录方式 | 4 |  |  |  |  |
@@ -351,7 +351,8 @@
 
 ## J04 WebDAV
 
-- 代码：`apps/pure_live/lib/features/web_dav/web_dav_auth.dart`、`apps/pure_live/lib/features/web_dav/web_dav_client.dart`、`packages/live_store/lib/src/webdav.dart`
+- 代码：`apps/pure_live/lib/features/web_dav/web_dav_auth.dart`、`apps/pure_live/lib/features/web_dav/web_dav_client.dart`、`apps/pure_live/lib/features/web_dav/web_dav_auto_backup.dart`、`apps/pure_live/lib/features/web_dav/web_dav_auto_backup_scheduler.dart`、`packages/live_store/lib/src/webdav.dart`
+- 设置：`webdavAutoBackupEnabled`、`webdavAutoBackupHours`、`webdavAutoBackupScope`、`webdavAutoBackupFolder`、`webdavAutoBackupKeep`、`webdavAutoBackupIncludeAccounts`
 
 ## J05 设备同步
 

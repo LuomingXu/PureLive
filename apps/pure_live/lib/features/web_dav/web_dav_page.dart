@@ -9,6 +9,7 @@ import 'package:live_net/live_net.dart';
 import 'package:live_store/live_store.dart';
 import 'package:live_ui/live_ui.dart';
 import 'package:pure_live/app/services.dart';
+import 'package:pure_live/features/web_dav/web_dav_auto_backup_dialog.dart';
 import 'package:pure_live/features/web_dav/web_dav_client.dart';
 import 'package:pure_live/features/web_dav/web_dav_config_dialog.dart';
 import 'package:pure_live/features/web_dav/web_dav_help.dart';
@@ -25,7 +26,7 @@ final Provider<LiveHttp> webDavHttpProvider = Provider<LiveHttp>((ref) => ref.wa
 /// The page's clock, for file names (tests replace it).
 final Provider<DateTime Function()> webDavClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-enum _Menu { uploadFollows, help }
+enum _Menu { uploadFollows, autoBackup, help }
 
 enum _FileChoice { restoreAll, restoreFollows, delete }
 
@@ -409,6 +410,12 @@ class _WebDavPageState extends ConsumerState<WebDavPage> {
                 enabled: canUpload,
               ),
               AppMenuEntry(
+                key: const ValueKey('webdav-menu-auto-backup'),
+                value: _Menu.autoBackup,
+                icon: AppIcons.autoSync,
+                label: i18n('webdav_auto_backup'),
+              ),
+              AppMenuEntry(
                 key: const ValueKey('webdav-menu-help'),
                 value: _Menu.help,
                 icon: AppIcons.help,
@@ -417,6 +424,7 @@ class _WebDavPageState extends ConsumerState<WebDavPage> {
             ],
             onSelected: (choice) => switch (choice) {
               _Menu.uploadFollows => unawaited(_upload(BackupScope.follows)),
+              _Menu.autoBackup => unawaited(showWebDavAutoBackupDialog(context, store: _store)),
               _Menu.help => _openHelp(),
             },
           ),
