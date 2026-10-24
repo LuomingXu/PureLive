@@ -589,8 +589,10 @@ void main() {
               badges++;
               expect((message.fansName, message.fansLevel), (medal['name'], '${medal['level']}'));
               expect(message.fansName, (info[3] as List<dynamic>)[1], reason: 'info[3] says the same');
+              expect(message.fansColor, isNotNull, reason: 'the badge colour is not masked either');
             } else {
               expect((message.fansName, message.fansLevel), ('', ''));
+              expect(message.fansColor, isNull);
               expect(info[3], isEmpty);
             }
             // S13-live's recorder scrambled the addresses (not http), so
@@ -654,6 +656,24 @@ void main() {
         expect(one(chat(medal: {'name': 5, 'level': 3})).fansName, '', reason: 'not text');
         expect((one(chat()).fansName, one(chat()).fansLevel), ('', ''));
         expect(one(chat(legacy: [0, ''])).fansName, '');
+        // The badge's colour: v2_medal_color_level, #RRGGBB or #RRGGBBAA.
+        expect(
+          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': '#3FB4F6E6'})).fansColor,
+          const LiveMessageColor(0x3F, 0xB4, 0xF6),
+        );
+        expect(
+          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': '3FB4F6'})).fansColor,
+          const LiveMessageColor(0x3F, 0xB4, 0xF6),
+        );
+        expect(one(chat(medal: {'name': '小路泥', 'level': 22})).fansColor, isNull);
+        expect(
+          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': '#12345'})).fansColor,
+          isNull,
+        );
+        expect(
+          one(chat(medal: {'name': '小路泥', 'level': 22, 'v2_medal_color_level': 'teal'})).fansColor,
+          isNull,
+        );
         // The old shape (rich user as JSON text, no medal) and none at all.
         expect(one(_danmu('旧')).fansName, '');
         expect(one(_danmu('旧')).data, isNull);

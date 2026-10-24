@@ -650,6 +650,7 @@ abstract final class BilibiliDanmakuProtocol {
       color: color == 0 ? LiveMessageColor.white : LiveMessageColor.numberToColor(color),
       fansName: medal.name,
       fansLevel: medal.level,
+      fansColor: _medalColor(rich),
       messageId: nonce.isEmpty ? '' : 'bilibili:$nonce',
       sentAt: sentAt,
       emotes: emotes('${info[1]}', meta),
@@ -675,6 +676,24 @@ abstract final class BilibiliDanmakuProtocol {
       return (name: text(legacy[1]), level: level(legacy[0]));
     }
     return (name: '', level: '');
+  }
+
+  /// The fan badge's colour: `user.medal.v2_medal_color_level` of the rich
+  /// user ([rich], decoded), `#RRGGBB` or CSS's `#RRGGBBAA`; null when there
+  /// is none or it is not such a colour. The alpha is not used.
+  static LiveMessageColor? _medalColor(Object? rich) {
+    if (rich is! Map) return null;
+    final user = rich['user'] is Map ? rich['user'] as Map : rich;
+    final medal = user['medal'];
+    if (medal is! Map) return null;
+    final text = medal['v2_medal_color_level'];
+    if (text is! String) return null;
+    var hex = text.trim();
+    if (hex.startsWith('#')) hex = hex.substring(1);
+    if (hex.length != 6 && hex.length != 8) return null;
+    final value = int.tryParse(hex.substring(0, 6), radix: 16);
+    if (value == null) return null;
+    return LiveMessageColor((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
   }
 
   /// The sender's avatar: `user.base.face` of the rich user ([rich],

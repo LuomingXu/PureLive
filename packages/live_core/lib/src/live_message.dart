@@ -301,6 +301,7 @@ final class LiveMessage {
     this.userLevel = '',
     this.fansLevel = '',
     this.fansName = '',
+    this.fansColor,
     this.isLocal = false,
     this.messageId = '',
     this.sentAt,
@@ -339,6 +340,10 @@ final class LiveMessage {
 
   /// Fan badge name.
   final String fansName;
+
+  /// The colour the platform gives the fan badge (Bilibili's
+  /// `v2_medal_color_level`); null for the chat's default.
+  final LiveMessageColor? fansColor;
 
   /// Composed on this device.
   final bool isLocal;

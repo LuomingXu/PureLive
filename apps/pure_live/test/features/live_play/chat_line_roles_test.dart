@@ -48,6 +48,7 @@ LiveMessage _chat({
   String fans = '',
   String level = '',
   String userLevel = '',
+  LiveMessageColor? fansColor,
   String room = '',
   List<LiveBadge> badges = const [],
   String avatar = '',
@@ -60,6 +61,7 @@ LiveMessage _chat({
   userLevel: userLevel,
   fansName: fans,
   fansLevel: level,
+  fansColor: fansColor,
   sourceRoomId: room,
   badges: badges,
   data: avatar.isEmpty ? null : DanmakuSender(avatar: avatar),
@@ -341,6 +343,29 @@ void main() {
           }
         }
       }
+    });
+
+    testWidgets('Bilibili: the fan medal takes v2_medal_color_level, else the theme block', (tester) async {
+      const medal = LiveMessageColor(0x3F, 0xB4, 0xF6);
+      final message = _chat(fans: '小路泥', level: '22', fansColor: medal);
+      for (final MapEntry(key: label, value: theme) in _themes.entries) {
+        for (final style in ChatListStyle.values) {
+          await _pumpLine(tester, ChatLine.chat(message), style: style, theme: theme, platform: SiteIds.bilibili);
+          final chip = tester.widget<ChatChip>(find.byKey(const ValueKey('live-play-chat-fans')));
+          final reason = '$label, $style';
+          expect(chip.background, const Color(0xFF3FB4F6), reason: reason);
+          expect(
+            contrastRatio(chip.style!.color!, chip.background),
+            greaterThanOrEqualTo(chatNameContrast),
+            reason: reason,
+          );
+        }
+      }
+      // Without the platform colour the theme's block stays (the legacy shape,
+      // and gifts, whose packets carry no v2 colour).
+      await _pumpLine(tester, ChatLine.chat(_chat(fans: '小路泥', level: '22')), platform: SiteIds.bilibili);
+      final chip = tester.widget<ChatChip>(find.byKey(const ValueKey('live-play-chat-fans')));
+      expect(chip.background, const LiveTheme().light.colorScheme.primary);
     });
 
     testWidgets('other platforms keep the theme block and no Lv; hiding names hides the level too', (tester) async {

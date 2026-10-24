@@ -85,6 +85,7 @@ void main() {
             color: const LiveMessageColor(1, 2, 3),
             userId: '7',
             fansName: '粉\uFFFC丝',
+            fansColor: const LiveMessageColor(0x3F, 0xB4, 0xF6),
             messageId: 'm1',
             sentAt: start,
             replayed: true,
@@ -114,6 +115,7 @@ void main() {
       expect(messages.first, same(clean));
       final chat = messages[1];
       expect((chat.message, chat.userName, chat.fansName), ('晚上好', '观众', '粉丝'));
+      expect(chat.fansColor, const LiveMessageColor(0x3F, 0xB4, 0xF6), reason: 'the badge colour survives the copy');
       expect(
         (chat.userId, chat.messageId, chat.sentAt, chat.replayed, chat.color),
         ('7', 'm1', start, true, const LiveMessageColor(1, 2, 3)),

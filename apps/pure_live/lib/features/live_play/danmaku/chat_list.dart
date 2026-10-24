@@ -853,18 +853,24 @@ class ChatLineView extends StatelessWidget {
   ];
 
   /// B06 c2: the fan medal ("粉丝牌 等级"), in the same block as the other
-  /// marks (A08.10 G5; it was a highlighted run of text). Douyu's medal takes
-  /// its level's colour (3.x), the others the theme's block.
+  /// marks (A08.10 G5; it was a highlighted run of text). A platform that
+  /// sends the badge's colour (Bilibili's `v2_medal_color_level`) paints the
+  /// chip with it; Douyu's medal takes its level's colour (3.x); the others
+  /// the theme's block.
   List<InlineSpan> _fans(ThemeData theme, LiveMessage message, Color background) {
     final fans = message.fansName.trim();
     if (fans.isEmpty) return const [];
     final level = message.fansLevel.trim();
     final scheme = theme.colorScheme;
-    final douyuColor = platform == SiteIds.douyu
+    final own = message.fansColor;
+    final ownColor = own == null ? null : Color.fromARGB(255, own.r, own.g, own.b);
+    final douyuColor = ownColor == null && platform == SiteIds.douyu
         ? douyuFanBadgeColor(int.tryParse(level) ?? 0, dark: theme.brightness == Brightness.dark)
         : null;
-    final chipBackground = douyuColor?.withValues(alpha: 0.16) ?? scheme.primary;
-    final chipInk = douyuColor == null
+    final chipBackground = ownColor ?? douyuColor?.withValues(alpha: 0.16) ?? scheme.primary;
+    final chipInk = ownColor != null
+        ? _readableOn(ownColor, chipBackground)
+        : douyuColor == null
         ? scheme.onPrimary
         : _readableOn(douyuColor, Color.alphaBlend(chipBackground, background));
     return [
