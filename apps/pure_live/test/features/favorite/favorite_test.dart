@@ -487,6 +487,33 @@ void main() {
       return (services, controller, douyu);
     }
 
+    testWidgets('desktop automatic pages fill the window and follow its size', (tester) async {
+      final follows = [for (var i = 0; i < 30; i++) room('douyu', '$i', nick: '主播$i', status: LiveStatus.live)];
+      final details = {for (var i = 0; i < 30; i++) '$i': follows[i]};
+      final (services, _, _) = await pumpPage(tester, follows: follows, details: details, width: 900);
+      final pagerSize = find.byKey(const ValueKey('pager-size'));
+      expect(find.descendant(of: pagerSize, matching: find.text('自动')), findsOneWidget);
+      final short = tester.widgetList(find.byType(LiveRoomCard)).length;
+      expect(short, lessThan(20));
+
+      tester.view.physicalSize = const Size(1500, 1400);
+      await tester.pumpAndSettle();
+      expect(tester.widgetList(find.byType(LiveRoomCard)).length, greaterThan(short));
+
+      // A picked size stays fixed when the window changes.
+      await tester.tap(pagerSize);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('20').last);
+      await tester.pumpAndSettle();
+      // The pager holds the picked size; the built cards are only the
+      // visible ones plus the sliver's cache.
+      expect(find.descendant(of: pagerSize, matching: find.text('20')), findsOneWidget);
+      tester.view.physicalSize = const Size(900, 900);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: pagerSize, matching: find.text('20')), findsOneWidget);
+      await tester.runAsync(services.close);
+    });
+
     testWidgets('no follows: the empty page leads to search, with a search icon', (tester) async {
       final (services, _, _) = await pumpPage(tester);
       expect(find.text(i18n('empty_favorite_title')), findsOneWidget);

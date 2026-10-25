@@ -17,6 +17,7 @@ import 'package:pure_live/features/settings/settings_model.dart';
 import 'package:pure_live/features/settings/settings_tiles.dart';
 import 'package:pure_live/i18n/i18n.dart';
 import 'package:pure_live/routes/app_navigator.dart';
+import 'package:pure_live/shared/rooms/room_cards.dart';
 
 // The appearance page and the pages it opens (3.x theme_settings_page.dart
 // and its sub-pages; docs/A-界面设计/A11-设置界面/A11.2-外观).
@@ -973,6 +974,26 @@ class _RoomCardSettingsPageState extends ConsumerState<RoomCardSettingsPage> {
             title: i18n('room_card_appearance'),
             footer: i18n('room_card_settings_scope_hint'),
             children: [
+              if (!_mobile)
+                SettingsChipsRow<RoomCardSize>(
+                  key: const ValueKey('settings-room-card-size'),
+                  title: i18n('room_card_size'),
+                  subtitle: i18n('room_card_size_desc'),
+                  icon: AppIcons.roomCardSettings,
+                  options: [
+                    for (final (size, label) in [
+                      (RoomCardSize.smaller, 'room_card_size_smaller'),
+                      (RoomCardSize.small, 'room_card_size_small'),
+                      (RoomCardSize.standard, 'room_card_size_standard'),
+                      (RoomCardSize.large, 'room_card_size_large'),
+                      (RoomCardSize.xlarge, 'room_card_size_xlarge'),
+                      (RoomCardSize.xxlarge, 'room_card_size_xxlarge'),
+                    ])
+                      (value: size, label: i18n(label), key: ValueKey('settings-room-card-size-${size.storageKey}')),
+                  ],
+                  selected: RoomCardSize.of(watchSetting(ref, Settings.roomCardSize)),
+                  onSelected: (value) => writeSetting(ref, Settings.roomCardSize, value.storageKey),
+                ),
               SettingsChipsRow<RoomCardLayout>(
                 key: const ValueKey('settings-room-card-layout'),
                 title: i18n('room_card_layout'),

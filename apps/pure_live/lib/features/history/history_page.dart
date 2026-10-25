@@ -378,8 +378,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final geometry = RoomGridGeometry.of(
+        final geometry = RoomGridGeometry.ofGrid(
           context,
+          ref,
           width: constraints.maxWidth,
           spacing: spacing,
           appearance: appearance,

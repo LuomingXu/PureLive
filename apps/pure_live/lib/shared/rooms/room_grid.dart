@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,6 +41,7 @@ final class RoomGridGeometry {
     bool dense = true,
     double? minItemWidth,
     int minColumns = 2,
+    int maxColumns = 8,
   }) {
     final windowWidth = MediaQuery.sizeOf(context).width;
     final columns = GridColumns.count(
@@ -47,6 +49,7 @@ final class RoomGridGeometry {
       minItemWidth: minItemWidth ?? GridColumns.roomMinWidth(windowWidth),
       spacing: spacing,
       min: minColumns,
+      max: maxColumns,
     );
     final itemWidth = GridColumns.itemWidth(width: width, columns: columns, spacing: spacing);
     final extent = LiveRoomCardMetrics.extent(
@@ -57,6 +60,35 @@ final class RoomGridGeometry {
       fontSizes: fontSizes,
     );
     return RoomGridGeometry._(columns, itemWidth, extent);
+  }
+
+  /// The same as [RoomGridGeometry.of] with the desktop card-size setting
+  /// (V02.44): the smallest card width is scaled and the column cap follows
+  /// the preset; phones keep [RoomCardSize.standard].
+  factory ofGrid(
+    BuildContext context,
+    WidgetRef ref, {
+    required double width,
+    required double spacing,
+    required RoomCardAppearance appearance,
+    LiveFontSizes fontSizes = const LiveFontSizes(),
+    bool dense = true,
+    double? minItemWidth,
+    int minColumns = 2,
+  }) {
+    final size = watchRoomCardSize(ref);
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    return RoomGridGeometry.of(
+      context,
+      width: width,
+      spacing: spacing,
+      appearance: appearance,
+      fontSizes: fontSizes,
+      dense: dense,
+      minItemWidth: (minItemWidth ?? GridColumns.roomMinWidth(windowWidth)) * size.scale,
+      minColumns: minColumns,
+      maxColumns: size.maxColumns,
+    );
   }
 
   const new _(this.columns, this.itemWidth, this.extent);
@@ -79,6 +111,18 @@ final class RoomGridGeometry {
         mainAxisSpacing: mainSpacing,
         mainAxisExtent: extent,
       );
+}
+
+/// How many rooms cover a grid area [height] high: the rows that reach it
+/// times [columns] (V02.44's automatic page size). The last row may be only
+/// partly on screen, so the page can scroll a little instead of leaving a
+/// blank band under the cards.
+int pageFillCount({required double height, required double extent, required int columns, required double spacing}) {
+  if (columns <= 0) return 0;
+  if (!height.isFinite || height <= 0) return columns;
+  final usable = math.max(0, height - roomGridPadding * 2);
+  final rows = ((usable + spacing) / (extent + spacing)).ceil().clamp(1, 20);
+  return rows * columns;
 }
 
 /// The clock of the cards' time on air (UPGRADES "开播时间"; tests replace
@@ -192,8 +236,9 @@ class RoomGridSkeleton extends ConsumerWidget {
     final mainSpacing = watchSetting(ref, Settings.mainAxisSpacing);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final geometry = RoomGridGeometry.of(
+        final geometry = RoomGridGeometry.ofGrid(
           context,
+          ref,
           width: constraints.maxWidth,
           spacing: spacing,
           appearance: appearance,
@@ -203,7 +248,7 @@ class RoomGridSkeleton extends ConsumerWidget {
           minColumns: minColumns,
         );
         final height = constraints.maxHeight.isFinite ? constraints.maxHeight : 800.0;
-        final rows = (height / (geometry.extent + mainSpacing)).ceil().clamp(1, 12);
+        final rows = (height / (geometry.extent + mainSpacing)).ceil().clamp(1, 20);
         return Semantics(
           key: const ValueKey('room-grid-skeleton'),
           label: i18n('refresh_loading'),
@@ -433,7 +478,11 @@ const ScrollPhysics _listPhysics = PureLiveScrollPhysics(parent: AlwaysScrollabl
 
 class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
   final ScrollController _scroll = createPureLiveScrollController();
+  final PageFillScheduler _fillScheduler = PageFillScheduler();
   int? _pageSize;
+  int? _autoCapacity;
+  int? _pendingAnchor;
+  int _autoFillFrom = -1;
   bool _opened = false;
 
   RoomFeed get _feed => widget.feed;
@@ -463,8 +512,19 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
     if (oldWidget.feed != widget.feed) {
       oldWidget.feed.removeListener(_feedChanged);
       widget.feed.addListener(_feedChanged);
+      _autoFillFrom = -1;
+      _autoCapacity = null;
+      _pendingAnchor = null;
+      _fillScheduler.reset();
     }
-    if (widget.pageSize != null && widget.pageSize != oldWidget.pageSize) _pageSize = widget.pageSize;
+    if (widget.pageSize != null && widget.pageSize != oldWidget.pageSize) {
+      _pageSize = widget.pageSize;
+      if (_pageSize == autoPageSize) {
+        _autoCapacity = null;
+        _autoFillFrom = -1;
+        _fillScheduler.reset();
+      }
+    }
   }
 
   @override
@@ -478,14 +538,25 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
     if (!mounted) return;
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fillViewport();
+      if (!mounted) return;
+      _fillViewport();
+      _fillAutoPage();
     });
   }
 
   bool get _desktop => usesDesktopPages(MediaQuery.sizeOf(context).width);
 
-  int get _currentPageSize =>
-      _pageSize ?? pageSizesOf(ref.read(storeProvider).settings, MediaQuery.sizeOf(context).width).size;
+  ({int size, List<int> options, bool auto}) get _sizes =>
+      pageSizesOf(ref.read(storeProvider).settings, MediaQuery.sizeOf(context).width);
+
+  /// The page size follows the window: picked "automatic" or the setting.
+  bool get _autoPage => _pageSize == autoPageSize || (_pageSize == null && _sizes.auto);
+
+  int get _currentPageSize {
+    final sizes = _sizes;
+    if (_autoPage) return _autoCapacity ?? sizes.size;
+    return _pageSize ?? sizes.size;
+  }
 
   int get _firstCount => _desktop ? _currentPageSize : phonePageSize;
 
@@ -511,6 +582,38 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
     if (_scroll.position.maxScrollExtent <= 0) _loadMore();
   }
 
+  // Automatic pages (V02.44): keep asking until the page fills the window.
+  // An `ensure` that another load is already serving returns at once, so the
+  // next change tries again; [_autoFillFrom] stops a platform that says
+  // "more" without new rooms from asking forever.
+  void _fillAutoPage() {
+    if (!_desktop || !_autoPage || !_feed.hasMore || _feed.busy || _feed.error != null) return;
+    final target = _feed.page * _currentPageSize;
+    if (_feed.rooms.length >= target) {
+      _autoFillFrom = -1;
+      return;
+    }
+    if (_autoFillFrom == _feed.rooms.length) return;
+    _autoFillFrom = _feed.rooms.length;
+    unawaited(_feed.ensure(target));
+  }
+
+  /// A measured capacity: keep the page that holds the room that led the old
+  /// one and load enough for the new size.
+  void _applyAutoCapacity(int capacity) {
+    if (!mounted || !_autoPage || capacity <= 0) return;
+    final old = _currentPageSize;
+    final anchor = _pendingAnchor ?? (_feed.page - 1) * old;
+    _pendingAnchor = null;
+    final page = anchor ~/ capacity + 1;
+    setState(() {
+      _autoCapacity = capacity;
+      _autoFillFrom = -1;
+    });
+    if (page != _feed.page && _scroll.hasClients) _scroll.jumpTo(0);
+    unawaited(_feed.goToPage(page, size: capacity));
+  }
+
   Future<void> _goToPage(int page) async {
     if (_scroll.hasClients) _scroll.jumpTo(0);
     await _feed.goToPage(page, size: _currentPageSize);
@@ -518,12 +621,21 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
 
   void _setPageSize(int size) {
     final old = _currentPageSize;
-    if (size == old) return;
+    final same = size == autoPageSize ? _autoPage : (!_autoPage && size == old);
+    if (same) return;
     // Keep the first room of the page in view (3.x).
     final first = (_feed.page - 1) * old;
-    setState(() => _pageSize = size);
+    setState(() {
+      _pageSize = size;
+      if (size == autoPageSize) {
+        _pendingAnchor = first;
+        _autoCapacity = null;
+        _fillScheduler.reset();
+      }
+      _autoFillFrom = -1;
+    });
     widget.onPageSize?.call(size);
-    unawaited(_goToPage(first ~/ size + 1));
+    unawaited(_goToPage(first ~/ _currentPageSize + 1));
   }
 
   bool _canGoNext(int pageSize) => _feed.rooms.length > _feed.page * pageSize || _feed.hasMore;
@@ -543,7 +655,7 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
     final prefix = widget.keyPrefix;
     final desktop = _desktop;
     final sizes = pageSizesOf(settings, MediaQuery.sizeOf(context).width);
-    final pageSize = _pageSize ?? sizes.size;
+    final pageSize = _currentPageSize;
     final hasContent = _feed.rooms.isNotEmpty;
 
     final Widget body;
@@ -560,13 +672,26 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
       Widget list(ScrollPhysics physics) {
         final grid = LayoutBuilder(
           builder: (context, constraints) {
-            final geometry = RoomGridGeometry.of(
+            final geometry = RoomGridGeometry.ofGrid(
               context,
+              ref,
               width: constraints.maxWidth,
               spacing: spacing,
               appearance: appearance,
               fontSizes: fontSizes,
             );
+            if (desktop) {
+              _fillScheduler.report(
+                pageFillCount(
+                  height: constraints.maxHeight,
+                  extent: geometry.extent,
+                  columns: geometry.columns,
+                  spacing: mainSpacing,
+                ),
+                enabled: () => mounted && _autoPage,
+                apply: _applyAutoCapacity,
+              );
+            }
             // Back on a home tab after another one, the rooms are where
             // they were (A11.6).
             return KeepScrollPosition(
@@ -635,6 +760,8 @@ class _RoomFeedViewState extends ConsumerState<RoomFeedView> {
                   pageSize: pageSize,
                   pageSizes: showSizes ? sizes.options : null,
                   showGoto: showGoto,
+                  auto: _autoPage,
+                  allowAuto: true,
                   onPage: (page) => unawaited(_goToPage(page)),
                   onPageSize: _setPageSize,
                   onRefresh: () => unawaited(_refresh()),

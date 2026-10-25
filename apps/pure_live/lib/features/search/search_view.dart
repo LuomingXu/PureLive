@@ -389,8 +389,9 @@ class _SearchViewState extends ConsumerState<SearchView> {
             onOpenWebSearch: () => unawaited(_openWebSearch()),
             onOpenScope: () => unawaited(_openScope()),
           );
-          final geometry = RoomGridGeometry.of(
+          final geometry = RoomGridGeometry.ofGrid(
             context,
+            ref,
             width: width,
             spacing: spacing,
             appearance: appearance,

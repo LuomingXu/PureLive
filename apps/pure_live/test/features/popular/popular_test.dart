@@ -505,6 +505,8 @@ void main() {
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final services = (await tester.runAsync(() => _services({SiteIds.bilibili: bilibili})))!;
+    // A fixed page keeps this about the first-content report, not auto-fill.
+    await services.store.settings.set(Settings.pageDefaultSize, 20);
     final strings = (await tester.runAsync(loadStrings))!;
     await tester.pumpWidget(
       ProviderScope(
@@ -764,7 +766,9 @@ void main() {
       [for (var i = 0; i < 30; i++) _room('bilibili', i, heat: 100 - i)],
     ]);
     final services = await _pump(tester, {SiteIds.bilibili: bilibili}, width: 1000, height: 3200);
-    // 20 a page above 960 px (3.x).
+    // 20 a page above 960 px (3.x); V02.44 made "automatic" fill the window.
+    await services.store.settings.set(Settings.pageDefaultSize, 20);
+    await tester.pumpAndSettle();
     expect(find.byType(LiveRoomCard), findsNWidgets(20));
     expect(find.byKey(const ValueKey('pager')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('pager-page-2')));
@@ -786,6 +790,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('popular-refresh-error')), findsOneWidget);
     expect(find.byType(LiveRoomCard), findsNWidgets(30));
+    await tester.runAsync(services.close);
+  });
+
+  testWidgets('desktop automatic pages fill the window and follow its size', (tester) async {
+    final bilibili = _FakeSite(SiteIds.bilibili, [
+      for (var page = 0; page < 3; page++)
+        [for (var i = 0; i < 30; i++) _room('bilibili', page * 30 + i, heat: 100 - i)],
+    ]);
+    final services = await _pump(tester, {SiteIds.bilibili: bilibili}, width: 1920, height: 1200);
+    final pagerSize = find.byKey(const ValueKey('pager-size'));
+    expect(find.descendant(of: pagerSize, matching: find.text('自动')), findsOneWidget);
+
+    // "Automatic" is not the old fixed 20: a wide window shows more cards.
+    final full = tester.widgetList(find.byType(LiveRoomCard)).length;
+    expect(full, greaterThan(20));
+
+    tester.view.physicalSize = const Size(1920, 1700);
+    await tester.pumpAndSettle();
+    final taller = tester.widgetList(find.byType(LiveRoomCard)).length;
+    expect(taller, greaterThan(full));
+
+    tester.view.physicalSize = const Size(1280, 800);
+    await tester.pumpAndSettle();
+    expect(tester.widgetList(find.byType(LiveRoomCard)).length, lessThan(full));
+
+    // A picked size stays fixed when the window changes.
+    await tester.tap(pagerSize);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('20').last);
+    await tester.pumpAndSettle();
+    // The pager holds the picked size; the built cards are only the visible
+    // ones plus the sliver's cache.
+    expect(find.descendant(of: pagerSize, matching: find.text('20')), findsOneWidget);
+    tester.view.physicalSize = const Size(1920, 1700);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: pagerSize, matching: find.text('20')), findsOneWidget);
+
+    // Back to automatic.
+    await tester.tap(pagerSize);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自动').last);
+    await tester.pumpAndSettle();
+    expect(tester.widgetList(find.byType(LiveRoomCard)).length, greaterThan(20));
     await tester.runAsync(services.close);
   });
 

@@ -13,13 +13,17 @@ import 'package:pure_live/shared/rooms/room_cards.dart';
 /// page size).
 const int phonePageSize = 20;
 
+/// The "automatic" page size (V02.44): as many rooms as the window fits,
+/// measured from the grid (rows × columns) and refilled when it changes.
+const int autoPageSize = 0;
+
 /// Whether a window of [width] uses desktop pages (3.x: wider than 680 and
 /// not a phone OS); otherwise the list grows at the end.
 bool usesDesktopPages(double width) => width > 680 && !isPhoneDevice;
 
 /// Rooms per desktop page and the choices (3.x `PageSettingsController`:
-/// 0 or a missing size means 20 above 960 px, else 12).
-({int size, List<int> options}) pageSizesOf(SettingsStore settings, double width) {
+/// 0 means as many as the window fits, else the stored size).
+({int size, List<int> options, bool auto}) pageSizesOf(SettingsStore settings, double width) {
   final wide = width > 960;
   final raw = settings.get(Settings.pageSizeOptions);
   final parsed = {
@@ -28,8 +32,47 @@ bool usesDesktopPages(double width) => width > 680 && !isPhoneDevice;
   }.toList()..sort();
   final options = parsed.isEmpty ? (wide ? const [20, 40, 60, 80] : const [12, 24, 36, 48]) : parsed;
   final stored = settings.get(Settings.pageDefaultSize);
-  final size = stored > 0 && options.contains(stored) ? stored : (stored > 0 ? options.first : (wide ? 20 : 12));
-  return (size: size, options: options.contains(size) ? options : ([...options, size]..sort()));
+  final auto = stored <= 0;
+  // Before the grid is laid out, [size] is the old fixed fallback.
+  final size = auto ? (wide ? 20 : 12) : stored;
+  return (size: size, options: options.contains(size) ? options : ([...options, size]..sort()), auto: auto);
+}
+
+/// Applies a measured page capacity once per change, after the frame that
+/// measured it: a grid cannot resize itself during build (V02.44).
+final class PageFillScheduler {
+  int? _applied;
+  int? _pending;
+  bool _scheduled = false;
+
+  /// Forgets the last capacity: a new grid (another platform, another page
+  /// list) has to be filled even when its capacity happens to be the same.
+  void reset() {
+    _applied = null;
+    _pending = null;
+  }
+
+  /// Reports [capacity] from a build; [enabled] and [apply] are read after
+  /// the frame. Nothing happens while [enabled] is false.
+  void report(int capacity, {required bool Function() enabled, required void Function(int capacity) apply}) {
+    if (!enabled()) {
+      _applied = null;
+      _pending = null;
+      return;
+    }
+    if (capacity == _applied || capacity == _pending) return;
+    _pending = capacity;
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      final next = _pending;
+      _pending = null;
+      if (next == null || !enabled() || next == _applied) return;
+      _applied = next;
+      apply(next);
+    });
+  }
 }
 
 /// The desktop page bar (3.x `DesktopPaginationBar`): refresh, previous,
@@ -47,6 +90,8 @@ class PaginationBar extends StatefulWidget {
     required this.onPage,
     required this.onPageSize,
     required this.onRefresh,
+    this.auto = false,
+    this.allowAuto = false,
     super.key,
   });
 
@@ -73,10 +118,17 @@ class PaginationBar extends StatefulWidget {
   /// stored but never read).
   final bool showGoto;
 
+  /// The page size follows the window ([autoPageSize]).
+  final bool auto;
+
+  /// Offers [autoPageSize] in the size menu (the room grids, not the area
+  /// cards).
+  final bool allowAuto;
+
   /// Go to a page.
   final ValueChanged<int> onPage;
 
-  /// Pick rooms per page.
+  /// Pick rooms per page; [autoPageSize] means "fill the window".
   final ValueChanged<int> onPageSize;
 
   /// Refresh.
@@ -218,8 +270,12 @@ class _PaginationBarState extends State<PaginationBar> {
                         onTap: () async {
                           final picked = await showAppMenu<int>(
                             anchor,
-                            selected: widget.pageSize,
-                            entries: [for (final size in sizes) AppMenuEntry(value: size, label: '$size')],
+                            selected: widget.auto && widget.allowAuto ? autoPageSize : widget.pageSize,
+                            entries: [
+                              if (widget.allowAuto)
+                                AppMenuEntry(value: autoPageSize, label: i18n('settings_page_size_auto')),
+                              for (final size in sizes) AppMenuEntry(value: size, label: '$size'),
+                            ],
                           );
                           if (picked != null) widget.onPageSize(picked);
                         },
@@ -233,7 +289,10 @@ class _PaginationBarState extends State<PaginationBar> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('${widget.pageSize}', style: styles.t13),
+                              Text(
+                                widget.auto ? i18n('settings_page_size_auto') : '${widget.pageSize}',
+                                style: styles.t13,
+                              ),
                               Icon(AppIcons.pageSize, size: 18, color: theme.hintColor),
                             ],
                           ),

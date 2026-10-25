@@ -525,6 +525,18 @@ void main() {
       expect(settingsCatalog.firstWhere((entry) => entry.id == 'accounts').titleText, '平台账号');
     });
 
+    testWidgets('room card size: the desktop target only, stored from the card page', (tester) async {
+      await withPlatform(TargetPlatform.windows, () async {
+        final h = await pumpSettings(tester, arguments: 'appearance');
+        await tapSettings(tester, settingsRow('room_card'));
+        expect(find.byKey(const ValueKey('settings-room-card-size')), findsOneWidget);
+        await tapSettings(tester, find.byKey(const ValueKey('settings-room-card-size-xxlarge')));
+        expect(h.settings.get(Settings.roomCardSize), 'xxlarge');
+        await tapSettings(tester, find.byKey(const ValueKey('settings-room-card-mobile')));
+        expect(find.byKey(const ValueKey('settings-room-card-size')), findsNothing);
+      });
+    });
+
     testWidgets('the exit countdown runs while switched on', (tester) async {
       final h = await pumpSettings(tester, arguments: 'general', seed: (s) => s.set(Settings.autoShutDownTime, 1));
       expect(AutoExitTimer.instance.remaining.value, isNull);

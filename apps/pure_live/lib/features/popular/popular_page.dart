@@ -78,7 +78,9 @@ class _PopularPageState extends ConsumerState<PopularPage> with TickerProviderSt
   int get _firstCount {
     final width = MediaQuery.sizeOf(context).width;
     if (!usesDesktopPages(width)) return phonePageSize;
-    return _catalog.pageSize ?? pageSizesOf(ref.read(storeProvider).settings, width).size;
+    final picked = _catalog.pageSize;
+    if (picked != null && picked > 0) return picked;
+    return pageSizesOf(ref.read(storeProvider).settings, width).size;
   }
 
   void _resumed() {

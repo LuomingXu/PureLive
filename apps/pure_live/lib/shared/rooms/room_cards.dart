@@ -141,6 +141,49 @@ AudiencePolicy watchAudiencePolicy(WidgetRef ref) => AudiencePolicy(
 /// Whether this device takes the phone forms (3.x `PlatformUtils.isMobile`).
 bool get isPhoneDevice => Platform.isAndroid || Platform.isIOS;
 
+/// The desktop card-size presets (V02.44): the smallest card width of UI.md
+/// §5.3 scaled, and the column cap raised so smaller cards really get more
+/// columns on wide windows ([RoomCardSize.standard] is today's grid).
+enum RoomCardSize {
+  /// The smallest cards (XS).
+  smaller('smaller', 0.8, 12),
+
+  /// Small cards (S).
+  small('small', 0.9, 10),
+
+  /// The widths of UI.md §5.3 and at most 8 columns (M).
+  standard('standard', 1, 8),
+
+  /// Large cards (L).
+  large('large', 1.25, 8),
+
+  /// Larger cards (XL).
+  xlarge('xlarge', 1.5, 8),
+
+  /// The largest cards (XXL).
+  xxlarge('xxlarge', 2, 8);
+
+  /// Creates the preset.
+  new(this.storageKey, this.scale, this.maxColumns);
+
+  /// The stored value.
+  final String storageKey;
+
+  /// The multiplier of the smallest card width.
+  final double scale;
+
+  /// The most columns this size allows.
+  final int maxColumns;
+
+  /// The preset of [key]; an unknown one is [standard].
+  static RoomCardSize of(String key) => values.firstWhere((value) => value.storageKey == key, orElse: () => standard);
+}
+
+/// The card size of this device: phones keep [RoomCardSize.standard]; the
+/// setting is shown and applied on desktops only (V02.44).
+RoomCardSize watchRoomCardSize(WidgetRef ref) =>
+    isPhoneDevice ? RoomCardSize.standard : RoomCardSize.of(watchSetting(ref, Settings.roomCardSize));
+
 /// The card appearance of this device (3.x `RoomCardSettingsController.resolve`:
 /// the phone settings on phones, the desktop ones elsewhere; an empty stored
 /// config uses the preset, an unreadable one too).

@@ -373,8 +373,11 @@ class _FollowGrid extends ConsumerStatefulWidget {
 
 class _FollowGridState extends ConsumerState<_FollowGrid> {
   final ScrollController _scroll = createPureLiveScrollController();
+  final PageFillScheduler _fillScheduler = PageFillScheduler();
   int _page = 1;
   int? _pageSize;
+  int? _autoCapacity;
+  int? _pendingAnchor;
 
   FavoriteController get _controller => widget.controller;
 
@@ -387,6 +390,35 @@ class _FollowGridState extends ConsumerState<_FollowGrid> {
   void _goTo(int page) {
     if (_scroll.hasClients) _scroll.jumpTo(0);
     setState(() => _page = page);
+  }
+
+  bool get _autoPage {
+    final sizes = pageSizesOf(ref.read(storeProvider).settings, MediaQuery.sizeOf(context).width);
+    return _pageSize == autoPageSize || (_pageSize == null && sizes.auto);
+  }
+
+  int get _currentPageSize {
+    final sizes = pageSizesOf(ref.read(storeProvider).settings, MediaQuery.sizeOf(context).width);
+    if (_pageSize == autoPageSize || (_pageSize == null && sizes.auto)) return _autoCapacity ?? sizes.size;
+    return _pageSize ?? sizes.size;
+  }
+
+  /// A measured capacity: keep the page that holds the room that led the old
+  /// one and re-slice.
+  void _applyAutoCapacity(int capacity) {
+    if (!mounted || !_autoPage || capacity <= 0) return;
+    final total = _controller.roomsFor(_controller.group, widget.platform).length;
+    final old = _currentPageSize;
+    final anchor = _pendingAnchor ?? (_page - 1) * old;
+    _pendingAnchor = null;
+    final last = total == 0 ? 1 : (total / capacity).ceil();
+    final page = (anchor ~/ capacity + 1).clamp(1, last);
+    final moved = page != _page;
+    setState(() {
+      _autoCapacity = capacity;
+      _page = page;
+    });
+    if (moved && _scroll.hasClients) _scroll.jumpTo(0);
   }
 
   @override
@@ -407,14 +439,15 @@ class _FollowGridState extends ConsumerState<_FollowGrid> {
     final windowWidth = MediaQuery.sizeOf(context).width;
     final desktop = usesDesktopPages(windowWidth);
     final sizes = pageSizesOf(store.settings, windowWidth);
-    final pageSize = _pageSize ?? sizes.size;
+    final auto = _pageSize == autoPageSize || (_pageSize == null && sizes.auto);
+    final pageSize = auto ? (_autoCapacity ?? sizes.size) : (_pageSize ?? sizes.size);
     final lastPage = all.isEmpty ? 1 : (all.length / pageSize).ceil();
     final page = _page.clamp(1, lastPage);
     final rooms = desktop ? all.sublist((page - 1) * pageSize, (page * pageSize).clamp(0, all.length)) : all;
     final mixed = widget.platform == allPlatforms;
 
     return LayoutBuilder(
-      builder: (context, constraints) {
+      builder: (context, _) {
         // The physics come from the pull-to-refresh view on phones (3.x's
         // bounce, P02), else the app's own.
         Widget scrollable(ScrollPhysics physics) {
@@ -425,79 +458,113 @@ class _FollowGridState extends ConsumerState<_FollowGrid> {
               slivers: [SliverFillRemaining(hasScrollBody: false, child: _emptyState(desktop: desktop))],
             );
           } else if (group == FollowGroup.offline) {
-            final columns = GridColumns.count(
-              width: constraints.maxWidth,
-              minItemWidth: favoriteRowMinWidth,
-              spacing: spacing,
-              min: 1,
-            );
-            final rowHeight = RoomRow.height - 16 + MediaQuery.textScalerOf(context).scale(15 + 13) * 1.4;
-            return GridView.builder(
-              key: PageStorageKey('favorite-rows-${widget.platform}'),
-              controller: _scroll,
-              padding: const EdgeInsets.all(roomGridPadding).withGlassBar(context),
-              physics: physics,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                crossAxisSpacing: spacing,
-                mainAxisSpacing: mainSpacing,
-                mainAxisExtent: rowHeight < RoomRow.height ? RoomRow.height : rowHeight,
-              ),
-              itemCount: rooms.length,
-              itemBuilder: (context, index) {
-                final room = rooms[index];
-                final pending = _pendingLabel(room);
-                final mark = roomMark(room);
-                final note = pending ?? mark;
-                return RoomRow(
-                  key: ValueKey(room.identityKey),
-                  data: policy.cardOf(room),
-                  trailing: note == null ? null : _RowNote(text: note),
-                  onTap: () => unawaited(AppNavigator.toLiveRoomDetail(liveRoom: room, playlist: all)),
-                  onLongPress: () => unawaited(
-                    showRoomMenu(
-                      context,
-                      store: store,
-                      room: room,
-                      actions: [if (liveAlertsAvailable) roomLiveAlertAction(context, store: store, room: room)],
+            return LayoutBuilder(
+              builder: (context, gridConstraints) {
+                final columns = GridColumns.count(
+                  width: gridConstraints.maxWidth,
+                  minItemWidth: favoriteRowMinWidth,
+                  spacing: spacing,
+                  min: 1,
+                );
+                final rowHeight = RoomRow.height - 16 + MediaQuery.textScalerOf(context).scale(15 + 13) * 1.4;
+                final extent = rowHeight < RoomRow.height ? RoomRow.height : rowHeight;
+                if (desktop) {
+                  _fillScheduler.report(
+                    pageFillCount(
+                      height: gridConstraints.maxHeight,
+                      extent: extent,
+                      columns: columns,
+                      spacing: mainSpacing,
                     ),
+                    enabled: () => mounted && _autoPage,
+                    apply: _applyAutoCapacity,
+                  );
+                }
+                return GridView.builder(
+                  key: PageStorageKey('favorite-rows-${widget.platform}'),
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(roomGridPadding).withGlassBar(context),
+                  physics: physics,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: mainSpacing,
+                    mainAxisExtent: extent,
                   ),
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) {
+                    final room = rooms[index];
+                    final pending = _pendingLabel(room);
+                    final mark = roomMark(room);
+                    final note = pending ?? mark;
+                    return RoomRow(
+                      key: ValueKey(room.identityKey),
+                      data: policy.cardOf(room),
+                      trailing: note == null ? null : _RowNote(text: note),
+                      onTap: () => unawaited(AppNavigator.toLiveRoomDetail(liveRoom: room, playlist: all)),
+                      onLongPress: () => unawaited(
+                        showRoomMenu(
+                          context,
+                          store: store,
+                          room: room,
+                          actions: [if (liveAlertsAvailable) roomLiveAlertAction(context, store: store, room: room)],
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             );
           } else {
-            final geometry = RoomGridGeometry.of(
-              context,
-              width: constraints.maxWidth,
-              spacing: spacing,
-              appearance: appearance,
-              fontSizes: fontSizes,
-              dense: dense,
-              minItemWidth: dense ? null : favoriteLargeCardMinWidth,
-              minColumns: dense ? 2 : 1,
-            );
-            return GridView.builder(
-              key: PageStorageKey('favorite-grid-${widget.platform}-${group.name}'),
-              controller: _scroll,
-              padding: const EdgeInsets.all(roomGridPadding).withGlassBar(context),
-              physics: physics,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              gridDelegate: geometry.delegate(spacing: spacing, mainSpacing: mainSpacing),
-              itemCount: rooms.length,
-              itemBuilder: (context, index) {
-                final room = rooms[index];
-                final pending = _pendingLabel(room);
-                return RoomGridCard(
-                  key: ValueKey(room.identityKey),
-                  room: room,
+            return LayoutBuilder(
+              builder: (context, gridConstraints) {
+                final geometry = RoomGridGeometry.ofGrid(
+                  context,
+                  ref,
+                  width: gridConstraints.maxWidth,
+                  spacing: spacing,
+                  appearance: appearance,
+                  fontSizes: fontSizes,
                   dense: dense,
-                  mixedPlatforms: mixed,
-                  statusPending: pending != null,
-                  statusPendingLabel: pending,
-                  now: now,
-                  // The group's rooms go along (U.2b2).
-                  onOpen: () => unawaited(AppNavigator.toLiveRoomDetail(liveRoom: room, playlist: all)),
-                  follow: true,
+                  minItemWidth: dense ? null : favoriteLargeCardMinWidth,
+                  minColumns: dense ? 2 : 1,
+                );
+                if (desktop) {
+                  _fillScheduler.report(
+                    pageFillCount(
+                      height: gridConstraints.maxHeight,
+                      extent: geometry.extent,
+                      columns: geometry.columns,
+                      spacing: mainSpacing,
+                    ),
+                    enabled: () => mounted && _autoPage,
+                    apply: _applyAutoCapacity,
+                  );
+                }
+                return GridView.builder(
+                  key: PageStorageKey('favorite-grid-${widget.platform}-${group.name}'),
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(roomGridPadding).withGlassBar(context),
+                  physics: physics,
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  gridDelegate: geometry.delegate(spacing: spacing, mainSpacing: mainSpacing),
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) {
+                    final room = rooms[index];
+                    final pending = _pendingLabel(room);
+                    return RoomGridCard(
+                      key: ValueKey(room.identityKey),
+                      room: room,
+                      dense: dense,
+                      mixedPlatforms: mixed,
+                      statusPending: pending != null,
+                      statusPendingLabel: pending,
+                      now: now,
+                      // The group's rooms go along (U.2b2).
+                      onOpen: () => unawaited(AppNavigator.toLiveRoomDetail(liveRoom: room, playlist: all)),
+                      follow: true,
+                    );
+                  },
                 );
               },
             );
@@ -540,12 +607,20 @@ class _FollowGridState extends ConsumerState<_FollowGrid> {
                     pageSize: pageSize,
                     pageSizes: showSizes ? sizes.options : null,
                     showGoto: showGoto,
+                    auto: auto,
+                    allowAuto: true,
                     onPage: _goTo,
                     onPageSize: (size) {
                       final first = (page - 1) * pageSize;
                       setState(() {
                         _pageSize = size;
-                        _page = first ~/ size + 1;
+                        if (size == autoPageSize) {
+                          _pendingAnchor = first;
+                          _autoCapacity = null;
+                          _page = first ~/ sizes.size + 1;
+                        } else {
+                          _page = first ~/ size + 1;
+                        }
                       });
                     },
                     onRefresh: () => unawaited(widget.onRefresh()),

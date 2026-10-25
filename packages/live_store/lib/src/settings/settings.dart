@@ -995,6 +995,17 @@ abstract final class Settings {
     backupKey: 'desktopConfig',
   );
 
+  /// How large the room cards of a desktop grid are (V02.44): `smaller`,
+  /// `small`, `standard` (the widths of UI.md §5.3), `large`, `xlarge` or
+  /// `xxlarge`.
+  static const roomCardSize = StringSetting(
+    'room_card_size',
+    section: 'roomCard',
+    defaultValue: 'standard',
+    allowed: {'smaller', 'small', 'standard', 'large', 'xlarge', 'xxlarge'},
+    backupKey: 'cardSize',
+  );
+
   // ---- page (page_settings_controller.dart:14-19) ----
 
   /// Page-size selector.
@@ -2121,6 +2132,7 @@ abstract final class Settings {
     roomCardDesktopPreset,
     roomCardMobileConfig,
     roomCardDesktopConfig,
+    roomCardSize,
     pageShowSizeSelector,
     pageShowGotoButton,
     pageShowScrollTop,

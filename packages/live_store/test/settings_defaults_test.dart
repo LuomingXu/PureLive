@@ -292,6 +292,7 @@ const Map<String, Object> newInV4 = {
   'portraitFullscreenSwipeSwitch': false, // A07.2, A07.3
   'livePlayChatCollapsed': false, // A07.5
   'roomSwitcherLayout': 'grid', // A07.13, D-022
+  'room_card_size': 'standard', // V02.44 (D-058): today's grid widths
   'danmakuListStyle': 'compact', // A07.1
   'showChatGifts': true, // A08.6
   'showChatNames': true, // A08.10: names shown, as 3.x

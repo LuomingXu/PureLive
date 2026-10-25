@@ -6,7 +6,7 @@
 
 路径规则按 OWNERS.toml 里的顺序第一条匹配的生效，所以一条目录规则只管前面的规则没拿走的文件。本页只随归属表、设置、来源和通道变化，加删代码文件不用重新生成。
 
-路径规则 223 条；设置 283 个（分节默认 24 条、单独指定 109 个）；来源 35 个；通道 21 个。
+路径规则 223 条；设置 284 个（分节默认 24 条、单独指定 109 个）；来源 35 个；通道 21 个。
 
 | 子分类 | 路径规则 | 设置 | 播放 | 弹幕 | 通道 |
 |---|---:|---:|---:|---:|---:|
@@ -17,7 +17,7 @@
 | A06 首页和全局 | 3 |  |  |  |  |
 | A07 直播间界面 | 3 | 12 |  |  | 1 |
 | A08 弹幕界面 | 5 | 11 |  |  |  |
-| A09 浏览界面 | 9 | 10 |  |  |  |
+| A09 浏览界面 | 9 | 11 |  |  |  |
 | A10 录制界面 | 6 |  |  |  |  |
 | A11 设置界面 | 1 |  |  |  |  |
 | A12 账号和数据界面 | 6 |  |  |  |  |
@@ -135,7 +135,7 @@
 ## A09 浏览界面
 
 - 代码：`apps/pure_live/lib/features/areas/`、`apps/pure_live/lib/features/area_rooms/`、`apps/pure_live/lib/features/hot_areas/`、`apps/pure_live/lib/features/favorite/`、`apps/pure_live/lib/features/history/`、`apps/pure_live/lib/features/popular/`、`apps/pure_live/lib/features/search/`、`apps/pure_live/lib/features/tags/`、`apps/pure_live/lib/shared/rooms/`
-- 设置：`room_card_mobile_preset`、`room_card_desktop_preset`、`room_card_mobile_config`、`room_card_desktop_config`、`page_show_size_selector`、`page_show_goto_button`、`page_show_scroll_top`、`page_default_size`、`page_size_options_raw`、`liveAlertRoomKeys`
+- 设置：`room_card_mobile_preset`、`room_card_desktop_preset`、`room_card_mobile_config`、`room_card_desktop_config`、`room_card_size`、`page_show_size_selector`、`page_show_goto_button`、`page_show_scroll_top`、`page_default_size`、`page_size_options_raw`、`liveAlertRoomKeys`
 
 ## A10 录制界面
 

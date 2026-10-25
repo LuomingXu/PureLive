@@ -29,7 +29,8 @@ final class PopularCatalog {
   /// The platform shown last (kept across home menu switches).
   String? currentPlatform;
 
-  /// The desktop page size picked on the page (3.x kept it per session).
+  /// The desktop page size picked on the page (3.x kept it per session);
+  /// 0 means "fill the window" (V02.44).
   int? pageSize;
 
   /// Called when the current platform should refresh after a ranking change.
