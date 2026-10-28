@@ -2363,6 +2363,16 @@ date = "2026-10-24"
 commit = "7a823612a836d04a774a575d1e6dee5ff16b18b1"
 
 [[task]]
+id = "D01.34"
+title = "斗鱼贵宾数显示为在线数（接 D01.3）"
+type = "平台"
+status = "开发中"
+size = "小"
+tier = 1
+from = "用户 2026-10-28：贵宾数不再显示在弹幕，改到热度、已开播那一栏；数据从弹幕 ws 取"
+note = "D-068。`oni` 的 `vn` 改报 LiveMessageType.online（onlineViewers），应用已有的观众栏直接显示；`oun` 仍不上报。代码和测试已改，当前环境没有 Flutter/Dart，未跑测试和门禁，待运行后补。"
+
+[[task]]
 id = "D02.1"
 title = "哔哩哔哩打码昵称不能“屏蔽此用户”，清理已存的打码屏蔽"
 type = "功能"

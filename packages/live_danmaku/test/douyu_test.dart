@@ -32,19 +32,30 @@ final Map<String, Object?> _recorded =
 
 final String _roomId = _recorded['roomId']! as String;
 
-/// The recorded messages of the kinds 3.x reports: 147 chats and, since
-/// 13f22bb58, the 6 贵宾 (`oni`) lines.
+/// The recorded messages of the kinds 3.x reported: 147 chats and, since
+/// 13f22bb58, the 6 贵宾 (`oni`) figures (chat lines in 3.x, online figures
+/// since 2026-10-28).
 const int _recordedCount = 153;
 
 List<Map<String, Object?>> get _recordedMessages => [
   for (final message in _recorded['messages']! as List<Object?>)
-    {
-      ...Map.of(message! as Map<String, Object?>),
-      // D07.3: 4.x leaves a fan level empty when there is no medal; 3.x
-      // wrote the packet's `bl` (0) even then.
-      if ((message as Map<String, Object?>)['fansName'] == '') 'fansLevel': '',
-    },
+    _recordedMessage(message! as Map<String, Object?>),
 ];
+
+/// The projection of what 4.x reports for one message 3.x wrote (record.md's
+/// intentional differences): an empty fan level without a medal (D07.3), and
+/// the 贵宾 count as an online figure, not a chat line from 贵宾 (2026-10-28).
+Map<String, Object?> _recordedMessage(Map<String, Object?> message) {
+  final fields = {...message, if (message['fansName'] == '') 'fansLevel': ''};
+  if (message['userName'] != '贵宾') return fields;
+  return {
+    ...fields,
+    'type': 'online',
+    'userName': '',
+    'message': '',
+    'data': {'kind': 'onlineViewers', 'value': int.parse(message['message']! as String)},
+  };
+}
 
 /// The projection legacy_expected.dart writes for 3.x's messages.
 Map<String, Object?> _project(LiveMessage message) {
@@ -75,6 +86,8 @@ Map<String, Object?> _project(LiveMessage message) {
           }
         : data is DouyuGift
         ? {'id': data.id, 'name': data.name, 'count': data.count, 'combo': data.combo, 'receiver': data.receiverName}
+        : data is LiveAudienceUpdate
+        ? {'kind': data.kind.name, 'value': data.value}
         : data,
   };
 }
@@ -281,18 +294,18 @@ void main() {
       expect((plain.userLevel, plain.fansName, plain.fansLevel), ('3', '', ''));
     });
 
-    test('oni is the 贵宾 count as a chat line; another room or no count gives nothing', () {
+    test('oni is the 贵宾 count as an online figure; another room or no count gives nothing', () {
       List<LiveMessage> oni(String fields) => DouyuDanmakuProtocol.decode(
         DouyuDanmakuProtocol.packet('type@=oni/$fields', type: DouyuDanmakuProtocol.serverPacketType),
         roomId: '1',
       );
       final vip = oni('vn@=17000/rid@=1/list@=/').single;
-      expect(
-        (vip.type, vip.userName, vip.message, vip.color),
-        (LiveMessageType.chat, '贵宾', '17000', LiveMessageColor.white),
-      );
+      expect((vip.type, vip.userName, vip.message), (LiveMessageType.online, '', ''));
+      final update = vip.data! as LiveAudienceUpdate;
+      expect((update.kind, update.value), (LiveAudienceMetricKind.onlineViewers, 17000));
       expect(oni('vn@=17000/rid@=2/list@=/'), isEmpty);
       expect(oni('vn@=/rid@=1/list@=/'), isEmpty);
+      expect(oni('vn@=abc/rid@=1/list@=/'), isEmpty);
     });
 
     test('PR 28: a mute from another room is ignored without losing the next message', () {
@@ -639,7 +652,7 @@ void main() {
     /// 3.x's output of the case they concern.
     final differences = <String, List<Map<String, Object?>> Function(List<Map<String, Object?>>)>{
       // 3.x ignored gifts (`dgb`); they are reported now (M4.D). Its 贵宾
-      // line (`oni`, 13f22bb58) stays.
+      // line (`oni`, 13f22bb58) is the online figure since 2026-10-28.
       'other packet types are ignored': (legacy) {
         expect(legacy.single['userName'], '贵宾');
         expect(legacy.single['message'], '1');
@@ -658,7 +671,20 @@ void main() {
             'isLocal': false,
             'data': {'id': '824', 'name': 'x', 'count': 1, 'combo': 0, 'receiver': ''},
           },
-          ...legacy,
+          {
+            'type': 'online',
+            'userName': '',
+            'userId': '',
+            'message': '',
+            'color': '#ffffff',
+            'messageId': '',
+            'sentAt': null,
+            'userLevel': '',
+            'fansLevel': '',
+            'fansName': '',
+            'isLocal': false,
+            'data': {'kind': 'onlineViewers', 'value': 1},
+          },
         ];
       },
       // 3.x turned a pandora box notice into a super chat of 0 yuan.
