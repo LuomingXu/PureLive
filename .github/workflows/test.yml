@@ -1,0 +1,66 @@
+# Tests on GitHub's Ubuntu runner: local machines may not have Flutter.
+#
+# The quick steps cover this change (WebDAV auto backup, backups, i18n,
+# settings); the last step runs the repository gate (format, dependency
+# direction, docs, owners, analyze and every test) exactly as before a push.
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        run: |
+          set -euo pipefail
+          grep -E '^FLUTTER_VERSION=' toolchain.env >> "$GITHUB_ENV"
+          python3 --version
+
+      - name: Linux test libraries
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Resolve packages and native bundles
+        run: |
+          set -euo pipefail
+          flutter --version
+          flutter pub get --enforce-lockfile
+          bash tools/ffmpeg_kit/fetch.sh linux
+
+      - name: Targeted tests
+        run: |
+          set -euo pipefail
+          dart format --output=none --set-exit-if-changed apps/pure_live packages/live_store
+          (cd packages/live_store && dart test test/settings_defaults_test.dart test/backup_test.dart test/stores_test.dart)
+          (cd apps/pure_live && dart analyze --fatal-infos)
+          (cd apps/pure_live && flutter test test/features/web_dav/ test/features/backup/ test/shared/backup_extras_test.dart test/i18n_test.dart)
+
+      - name: Full gate
+        run: bash tools/gate/gate.sh --all
